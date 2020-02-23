@@ -1,0 +1,9 @@
+scipy
+gensim
+selenium
+pandas
+beautifulsoup4
+aiohttp
+asyncio
+numpy
+scikit-learn
