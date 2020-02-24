@@ -1,13 +1,12 @@
-from datetime import datetime
-
-from recipes.core import (
-    fetch, limited_as_completed
-)
+import asyncio
 import os
+
 import pandas as pd
 from aiohttp import ClientSession
-import asyncio
 from bs4 import BeautifulSoup
+from core import (
+    fetch, limited_as_completed
+)
 
 
 def save_recipes(df, session):
@@ -28,7 +27,6 @@ async def get_recipe(link, name, session):
     except Exception as e:
         print(f'request failed, message: {e}')
         return {}
-    start = datetime.now()
     soup = BeautifulSoup(html, 'html.parser')
     recipe_dict['name'] = getattr(soup.find('h1', {'class': 'gel-trafalgar content-title__text'}), 'text', name)
     try:
@@ -43,21 +41,26 @@ async def get_recipe(link, name, session):
         recipe_dict['serves'] = soup.findAll("p", {"class": 'recipe-metadata__serving'})[-1].text
     except IndexError:
         print('No serving info found')
+    recipe_dict['ingredients'] = '::'.join(get_ingredients(soup))
+    recipe_dict['instructions'] = '::'.join(get_instructions(soup))
+    print(f'Processed details for {recipe_dict["name"]}')
+    return recipe_dict
 
+
+def get_ingredients(soup):
     ingredients_html = soup.findAll("li", {"class": 'recipe-ingredients__list-item'})
     ingredients = []
     for ingredient_cell in ingredients_html:
         ingredients.append(ingredient_cell.text)
-    recipe_dict['ingredients'] = '::'.join(ingredients)
+    return ingredients
+
+
+def get_instructions(soup):
     instructions_html = soup.findAll("p", {"class": 'recipe-method__list-item-text'})
     instructions = []
     for instruction_cell in instructions_html:
         instructions.append(instruction_cell.text)
-    recipe_dict['instructions'] = '::'.join(instructions)
-    end = datetime.now()
-    print(f'{(end - start).total_seconds()} seconds:')
-    print(f'Processed details for {recipe_dict["name"]}')
-    return recipe_dict
+    return instructions
 
 
 async def run(df):
@@ -71,7 +74,7 @@ async def run(df):
                 continue
             if recipe:
                 recipes.append(recipe)
-    pd.DataFrame(recipes).to_csv(os.path.join('data', 'bbc',  'recipe_details.csv'))
+    pd.DataFrame(recipes).to_csv(os.path.join('data', 'bbc', 'recipe_details.csv'))
 
 
 if __name__ == "__main__":

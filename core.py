@@ -1,7 +1,5 @@
-from itertools import islice
-
-import aiohttp
 import asyncio
+from itertools import islice
 
 
 async def fetch(url, session):
@@ -14,10 +12,10 @@ async def bound_fetch(url, session, sem):
         await fetch(url, session)
 
 
-def limited_as_completed(coros, limit=100):
+def limited_as_completed(coroutines, limit=100):
     futures = [
         asyncio.create_task(c)
-        for c in islice(coros, 0, limit)
+        for c in islice(coroutines, 0, limit)
     ]
 
     async def first_to_finish():
@@ -27,11 +25,12 @@ def limited_as_completed(coros, limit=100):
                 if f.done():
                     futures.remove(f)
                     try:
-                        new_f = next(coros)
+                        new_f = next(coroutines)
                         futures.append(
                             asyncio.create_task(new_f))
                     except StopIteration as e:
                         pass
                     return f.result()
+
     while len(futures) > 0:
         yield first_to_finish()

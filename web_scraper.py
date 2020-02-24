@@ -1,22 +1,24 @@
+"""
+Scrapes the BBC food recipe index for links to every recipe
+"""
+
+import asyncio
 import os
 import string
 
-import asyncio
 import pandas as pd
 import requests
 from aiohttp import ClientSession
-
-from recipes.core import (
-    fetch, limited_as_completed
-)
 from bs4 import BeautifulSoup
 
-recipes_home = 'https://www.bbc.co.uk/food/recipes/a-z/'  # a/1 , a/2 , b/1 ...
+from core import (
+    fetch, limited_as_completed
+)
 
 
 def get_recipe_pages(session):
-    letters = string.ascii_lowercase
-    for letter in letters:
+    recipes_home = 'https://www.bbc.co.uk/food/recipes/a-z/'  # a/1 , a/2 , b/1 ...
+    for letter in string.ascii_lowercase:
         recipe_page_letter = recipes_home + letter
         num_pages = get_num_of_pages(recipe_page_letter)
         print(f'found {num_pages} pages for {letter}')
