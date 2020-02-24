@@ -1,4 +1,7 @@
-import itertools
+"""
+Word2Vec model for recipe analysis
+"""
+
 import os
 import csv
 import re
@@ -155,7 +158,7 @@ class RecipeAnalyzer(object):
     def replace_ingredient(self, missing_ingredient, k=5):
         """
         Find the k most similar ingredients to a specified ingredient name.
-        Uses cosing distance
+        Uses cosine distance
         """
         replacements = self.model.wv.most_similar(positive=[missing_ingredient], topn=k)
         print(f'Replacing {missing_ingredient} with: \n{replacements}')
@@ -164,7 +167,7 @@ class RecipeAnalyzer(object):
 
 class RecipeCorpus(object):
     """
-    Iterator that yields lists of ingredients
+    Iterator that yields recipe data
     """
 
     def __init__(self, corpus_path=None):
