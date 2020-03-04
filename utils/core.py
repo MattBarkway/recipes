@@ -13,6 +13,10 @@ async def bound_fetch(url, session, sem):
 
 
 def limited_as_completed(coroutines, limit=100):
+    """
+    taken from:
+    https://www.artificialworlds.net/blog/2017/05/31/python-3-large-numbers-of-tasks-with-limited-concurrency/
+    """
     futures = [
         asyncio.create_task(c)
         for c in islice(coroutines, 0, limit)

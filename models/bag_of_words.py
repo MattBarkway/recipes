@@ -1,7 +1,7 @@
 """
 Word2Vec model for recipe analysis
 """
-
+import json
 import os
 import csv
 import re
@@ -14,13 +14,14 @@ from gensim.models import Word2Vec, KeyedVectors
 from sklearn.cluster import KMeans
 from scipy.spatial import KDTree
 
-from helpers import get_gen_at_index
+from recipes.utils.helpers import get_gen_at_index
 
 
 class RecipeAnalyzer(object):
     """
     Class to inspect and analyze the recipe data
     """
+
     def __init__(self):
         self.corpus = RecipeCorpus()
         self._recipe_vectors = {}
@@ -41,9 +42,9 @@ class RecipeAnalyzer(object):
         Attempt to load an existing model from path, else create one
         """
         if not path:
-            path = os.path.join('..', 'created_models', 'w2v_ingredients.model')
+            path = os.path.join('.', 'created_models', 'w2v_ingredients.model')
         if not os.path.exists(path):
-            self._model = Word2Vec(self.corpus.get_processed_ingredients())
+            self._model = Word2Vec([x for x in self.corpus.get_processed_ingredients()])
         else:
             self._model = Word2Vec.load(path)
 
@@ -51,7 +52,7 @@ class RecipeAnalyzer(object):
         """
         Save the Word2Vec model with a name
         """
-        self._model.save(os.path.join('..', 'created_models', name))
+        self._model.save(os.path.join('.', 'created_models', name))
 
     def save_trained(self, name='trained_w2v_ingredients.kv'):
         """
@@ -59,13 +60,13 @@ class RecipeAnalyzer(object):
         """
         if not self._vectors:
             raise SetupError('Model not yet trained')
-        self._vectors.save(os.path.join('..', 'created_models', name))
+        self._vectors.save(os.path.join('.', 'created_models', name))
 
     def load_or_train(self, name='trained_w2v_ingredients.kv'):
         """
         Attempt to load the specified .kv file, else train model and create one
         """
-        path = os.path.join('..', 'created_models', name)
+        path = os.path.join('.', 'created_models', name)
         if not os.path.exists(path):
             self.train()
         else:
@@ -76,7 +77,8 @@ class RecipeAnalyzer(object):
         """
         Train Word2Vec model, to generate word vectors
         """
-        self._model.train(self.corpus.get_processed_ingredients(), epochs=epochs, total_examples=self._model.corpus_count, **kwargs)
+        self._model.train(self.corpus.get_processed_ingredients(), epochs=epochs,
+                          total_examples=self._model.corpus_count, **kwargs)
         self._vectors = self._model.wv
         self._recipe_vectors = self.calc_recipe_vectors()
 
@@ -85,7 +87,7 @@ class RecipeAnalyzer(object):
         Calculate vectors for each recipe, by summing the individual word vectors for each ingredient
         """
         vector_dict = {}
-        for idx, processed_ingredients in enumerate(self.corpus.get_processed_ingredients()):
+        for idx, (name, processed_ingredients) in enumerate(self.corpus.get_ingredient_tuples()):
             vecs = []
             for word in processed_ingredients:
                 try:
@@ -96,7 +98,6 @@ class RecipeAnalyzer(object):
             vec_sum = sum(vecs)
             if not isinstance(vec_sum, np.ndarray) or len(vec_sum) != 100:
                 vec_sum = np.zeros(100)
-            name = get_gen_at_index(self.corpus.get_names(), idx)
             vector_dict[name] = vec_sum
         return vector_dict
 
@@ -108,6 +109,8 @@ class RecipeAnalyzer(object):
         unique_ingredients = set(list(ingredients))
         vector_dict = {}
         for ingredient in unique_ingredients:
+            if not ingredient:
+                continue
             vecs = []
             for word in ingredient.split(' '):
                 try:
@@ -118,8 +121,37 @@ class RecipeAnalyzer(object):
             vec_sum = sum(vecs)
             if not isinstance(vec_sum, np.ndarray) or len(vec_sum) != 100:
                 vec_sum = np.zeros(100)
-            vector_dict['ingredient'] = vec_sum
+            vector_dict[ingredient] = vec_sum
         return vector_dict
+
+    def save_vecs(self, path=None):
+        """
+        Save word vectors, ingredient vectors and recipe level vectors to JSON
+        :return:
+        """
+        if not path:
+            path = os.path.join('.', 'created_models', 'all_vectors.json')
+        ingredient_vecs = self.calc_ingredient_vecs()
+        recipe_vecs = self.calc_recipe_vectors()
+        word_vecs = {
+            self._vectors.index2word[idx]: vec
+            for idx, vec in enumerate(self._vectors.vectors)
+        }
+        data = {
+            'ingredients': {key: value.tolist() for key, value in ingredient_vecs.items()},
+            'recipes': {key: value.tolist() for key, value in recipe_vecs.items()},
+            'words': {key: value.tolist() for key, value in word_vecs.items()},
+        }
+        with open(path, 'w') as f:
+            json.dump(data, f)
+
+    def load_vecs(self, path=None):
+        if not path:
+            os.path.join('.', 'created_models', 'all_vectors.json')
+        data = json.load(path)
+        self._recipe_vectors = data['recipes']
+        self._ingredient_vectors = data['ingredients']
+        self._vectors = data['words']
 
     def cluster(self, n=3):
         """
@@ -172,35 +204,54 @@ class RecipeCorpus(object):
 
     def __init__(self, corpus_path=None):
         if not corpus_path:
-            corpus_path = os.path.join('..', 'data', 'bbc', 'recipe_details.csv')
+            corpus_path = os.path.join('.', 'data', 'bbc', 'recipe_details.csv')
         self.corpus_path = corpus_path
         self._names = []
         self.column_names = []
 
     def __iter__(self):
         with open(self.corpus_path, 'r', encoding='utf-8') as f:
-            csv_reader = csv.reader(f, delimeter=',')
+            csv_reader = csv.reader(f)
             self.column_names = next(csv_reader)
             for line in csv_reader:
                 yield line
 
-    def get_col_values(self, col_index):
+    def get_row(self, index):
+        with open(self.corpus_path, 'r', encoding='utf-8') as f:
+            csv_reader = csv.reader(f)
+            return list(csv_reader)[index+1]
+
+    def get_col_values(self, col_indexes):
         for line in self.__iter__():
-            yield line[col_index]
+            yield [line[col_index] for col_index in col_indexes]
+
+    def get_col_value(self, col_index, index):
+        return self.get_row(index)[col_index]
+
+    def get_ingredient_tuples(self):
+        for name, ingredients in self.get_col_values([1, 5]):
+            formatted_ingredient_items = [self.pre_process_ingredient(ingredient)
+                                          for ingredient in ingredients.split('::')]
+            yield name, utils.simple_preprocess(' '.join(formatted_ingredient_items))
 
     def get_processed_ingredients(self):
-        for ingredients in self.get_col_values(5):
-            yield utils.simple_preprocess(' '.join(ingredients.split('::')))
+        for ingredients in self.get_col_values([5]):
+            formatted_ingredient_items = [self.pre_process_ingredient(ingredient)
+                                          for ingredient in ingredients[0].split('::')]
+            yield utils.simple_preprocess(' '.join(formatted_ingredient_items))
 
     def get_names(self):
-        return self.get_col_values(1)  # TODO get index of name
+        return (x[0] for x in self.get_col_values([1]))
+
+    def get_name(self, index):
+        return self.get_col_value(1, index)
 
     def get_flat_ingredients(self):
         for line in csv.reader(open(self.corpus_path, 'r', encoding='utf-8'), delimiter=','):
             if not line[0]:
                 continue  # skip header row
             for ingredient in line[5].split('::'):
-                yield ingredient
+                yield self.pre_process_ingredient(ingredient)
 
     @staticmethod
     def pre_process_ingredient(item):
@@ -212,7 +263,13 @@ class RecipeCorpus(object):
         :param item:
         :return:
         """
-        return re.sub(r'\d+[a-zA-Z/¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]+|\d+', '', item).strip()
+        char_sets = [
+            r'\d+[a-zA-Z/¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]+',
+            r'\d+',
+            r'[().,!?\'"\-+]',
+            r'[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]',
+        ]
+        return re.sub(r'|'.join(char_sets), '', item).strip()
 
 
 class SetupError(BaseException):
