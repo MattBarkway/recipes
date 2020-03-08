@@ -1,7 +1,7 @@
 import itertools
 import math
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 
 import pandas as pd
 import os

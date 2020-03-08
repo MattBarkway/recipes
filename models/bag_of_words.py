@@ -1,7 +1,6 @@
 """
 Word2Vec model for recipe analysis
 """
-import itertools
 import json
 import os
 import csv
@@ -10,14 +9,13 @@ import re
 from collections import defaultdict
 
 import numpy as np
-from gensim import utils
 from gensim.models import Word2Vec, KeyedVectors
 
 from sklearn.cluster import KMeans
 from scipy.spatial import KDTree
 
-from recipes.utils.exceptions import SetupError
-from recipes.utils.helpers import get_gen_at_index
+from utils.exceptions import SetupError
+from utils.helpers import get_gen_at_index
 
 
 class RecipeAnalyzer(object):
@@ -113,6 +111,7 @@ class RecipeAnalyzer(object):
 
     def calc_ingredient_vecs(self):
         """
+        TODO refactor this to be less of a mess
         Calculate vectors for each ingredient item
         """
         unique_ingredients = set()

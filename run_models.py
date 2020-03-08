@@ -1,7 +1,7 @@
 """
 Run the models
 """
-from recipes.models.bag_of_words import RecipeAnalyzer, IngredientOnlyCorpus
+from models.bag_of_words import RecipeAnalyzer, IngredientOnlyCorpus
 
 
 def run():
