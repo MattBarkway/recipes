@@ -228,7 +228,7 @@ class BaseRecipeCorpus(BaseCorpus):
 
     def __init__(self, corpus_path=None):
         if not corpus_path:
-            corpus_path = os.path.join('..', 'data', 'bbc', 'recipe_details.csv')
+            corpus_path = os.path.join('..', 'data', 'recipe_details.csv')
         super().__init__(corpus_path=corpus_path)
         self.column_names = []
 

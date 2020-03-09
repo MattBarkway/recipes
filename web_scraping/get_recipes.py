@@ -1,4 +1,5 @@
 import asyncio
+import csv
 import os
 
 import pandas as pd
@@ -65,20 +66,23 @@ def get_instructions(soup):
 
 async def run(df, output_path):
     recipes = []
+    fieldnames = []
     async with ClientSession() as session:
-        for result in limited_as_completed(save_recipes(df, session), limit=1000):
-            try:
-                recipe = await result
-            except Exception as e:
-                print(e)
-                continue
-            if recipe:
-                recipes.append(recipe)
+        with open(output_path, 'a') as f:
+            writer = csv.writer(f)
+            for result in limited_as_completed(save_recipes(df, session), limit=1000):
+                try:
+                    recipe = await result
+                except Exception as e:
+                    print(e)
+                    continue
+                if recipe:
+                    writer.writerow([recipe.get(field, '') for field in fieldnames], newline='', encoding='utf-8')
     pd.DataFrame(recipes).to_csv(output_path)
 
 
 if __name__ == "__main__":
-    output_path = os.path.join('data', 'bbc', 'recipe_details.csv')
-    _df = pd.read_csv(os.path.join('data', 'bbc', 'recipe_pages.csv'), index_col=0)
+    output_path = os.path.join('data', 'recipe_details.csv')
+    _df = pd.read_csv(os.path.join('data', 'recipe_pages.csv'), index_col=0)
     _df = _df.drop_duplicates()
     asyncio.run(run(_df, output_path))

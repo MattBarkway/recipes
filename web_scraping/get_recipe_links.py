@@ -3,10 +3,10 @@ Scrapes the BBC food recipe index for links to every recipe
 """
 
 import asyncio
+import csv
 import os
 import string
 
-import pandas as pd
 import requests
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
@@ -81,18 +81,20 @@ def get_recipe_from_cell(recipe_cell):
 
 
 async def run(output_path):
-    recipe_pages = []
+    fieldnames = ['name', 'category', 'link']
     async with ClientSession() as session:
-        for result in limited_as_completed(get_recipe_pages(session), 1000):
-            try:
-                recipe_page = await result
-            except Exception as e:
-                print(e)
-                continue
-            if recipe_page:
-                recipe_pages.extend(recipe_page)
-        pd.DataFrame(recipe_pages).to_csv(output_path)
+        with open(output_path, 'a') as f:
+            writer = csv.writer(f)
+            for result in limited_as_completed(get_recipe_pages(session), 1000):
+                try:
+                    recipe_page = await result
+                except Exception as e:
+                    print(e)
+                    continue
+                if recipe_page:
+                    for recipe in recipe_page:
+                        writer.writerow([recipe.get(field, '') for field in fieldnames], newline='', encoding='utf-8')
 
 
 if __name__ == "__main__":
-    asyncio.run(run(os.path.join('data', 'bbc', 'recipe_pages.csv')))
+    asyncio.run(run(os.path.join('data', 'recipe_pages.csv')))

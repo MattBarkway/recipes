@@ -67,7 +67,7 @@ class TfIdf(object):
 
 
 if __name__ == "__main__":
-    _df = pd.read_csv(os.path.join('data', 'bbc', 'recipe_details.csv'), index_col=0)
+    _df = pd.read_csv(os.path.join('data', 'recipe_details.csv'), index_col=0)
     names = _df['name'].tolist()
     tf_idf_obj = TfIdf()
     _tf_idf = tf_idf_obj.perform_tf_idf(names)
