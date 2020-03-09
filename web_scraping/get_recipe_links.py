@@ -83,7 +83,7 @@ def get_recipe_from_cell(recipe_cell):
 async def run(output_path):
     fieldnames = ['name', 'category', 'link']
     async with ClientSession() as session:
-        with open(output_path, 'a') as f:
+        with open(output_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for result in limited_as_completed(get_recipe_pages(session), 1000):
                 try:
@@ -93,7 +93,7 @@ async def run(output_path):
                     continue
                 if recipe_page:
                     for recipe in recipe_page:
-                        writer.writerow([recipe.get(field, '') for field in fieldnames], newline='', encoding='utf-8')
+                        writer.writerow([recipe.get(field, '') for field in fieldnames])
 
 
 if __name__ == "__main__":
