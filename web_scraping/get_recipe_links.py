@@ -22,12 +22,7 @@ def get_recipe_pages(session):
         print(f'found {num_pages} pages for {letter}')
         for idx in range(num_pages):
             recipe_page = f'{recipe_page_letter}/{idx + 1}'
-            try:
-                data = get_recipes_on_page(recipe_page, session)
-            except Exception as e:
-                print(e)
-                continue
-            yield data
+            yield get_recipes_on_page(recipe_page, session)
 
 
 def get_num_of_pages(url):
@@ -61,16 +56,12 @@ async def get_recipes_on_page(recipe_page, session):
 
 
 def get_recipe_from_cell(recipe_cell):
-    try:
-        recipe_dict = {
-            'name': recipe_cell.find('h3', {'class': 'promo__title'}).text,
-            'category': recipe_cell.find('span', {'class': 'promo__type'}).text,
-            'link': recipe_cell['href']
-        }
-        print(f'Added recipe \'{recipe_dict["name"]}\'')
-    except Exception as e:
-        print(e)
-        recipe_dict = {}
+    recipe_dict = {
+        'name': recipe_cell.find('h3', {'class': 'promo__title'}).text,
+        'category': recipe_cell.find('span', {'class': 'promo__type'}).text,
+        'link': recipe_cell['href']
+    }
+    print(f'Added recipe \'{recipe_dict["name"]}\'')
     return recipe_dict
 
 
@@ -80,12 +71,7 @@ async def run(output_path, k=100):
         with open(output_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             for result in limited_as_completed(get_recipe_pages(session), k):
-                try:
-                    recipe_page = await result
-                except Exception as e:
-                    print(e)
-                    raise
-                    continue
+                recipe_page = await result
                 if recipe_page:
                     for recipe in recipe_page:
                         writer.writerow([recipe.get(field, '') for field in fieldnames])

@@ -1,8 +1,6 @@
 import asyncio
 from itertools import islice
 
-from utils.exceptions import MaxRetryError
-
 
 async def fetch(url, session):
     async with session.get(url) as response:
