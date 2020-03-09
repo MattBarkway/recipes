@@ -6,6 +6,7 @@ import pandas as pd
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from utils.core import limited_as_completed, get_content
+from utils.exceptions import MaxRetryError
 
 
 def save_recipes(df, session):
@@ -42,6 +43,8 @@ def process_recipe_html(html, name):
 
 async def get_recipe(link, name, session):
     html = await get_content(f'https://www.bbc.co.uk{link}', session)
+    if not html:
+        return {}
     return process_recipe_html(html, name)
 
 

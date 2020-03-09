@@ -51,4 +51,4 @@ async def get_content(link, session, retries=5):
             await asyncio.sleep(5)
             print(f'retry: {attempts}')
             attempts += 1
-    raise MaxRetryError('Exceeded maximum number of retries')
+    return None

@@ -47,6 +47,8 @@ def get_num_of_pages(url):
 
 async def get_recipes_on_page(recipe_page, session):
     html = await get_content(recipe_page, session)
+    if not html:
+        return []
     print(f'got data for {recipe_page}')
     soup = BeautifulSoup(html, 'html.parser')
     recipe_cells = soup.findAll('a', {'class': 'promo'})
