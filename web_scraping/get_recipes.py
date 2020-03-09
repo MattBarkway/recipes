@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-from core import (
+from utils.core import (
     fetch, limited_as_completed
 )
 
@@ -63,7 +63,7 @@ def get_instructions(soup):
     return instructions
 
 
-async def run(df):
+async def run(df, output_path):
     recipes = []
     async with ClientSession() as session:
         for result in limited_as_completed(save_recipes(df, session), limit=1000):
@@ -74,10 +74,11 @@ async def run(df):
                 continue
             if recipe:
                 recipes.append(recipe)
-    pd.DataFrame(recipes).to_csv(os.path.join('data', 'bbc', 'recipe_details.csv'))
+    pd.DataFrame(recipes).to_csv(output_path)
 
 
 if __name__ == "__main__":
+    output_path = os.path.join('data', 'bbc', 'recipe_details.csv')
     _df = pd.read_csv(os.path.join('data', 'bbc', 'recipe_pages.csv'), index_col=0)
     _df = _df.drop_duplicates()
-    asyncio.run(run(_df))
+    asyncio.run(run(_df, output_path))

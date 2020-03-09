@@ -11,7 +11,7 @@ import requests
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
-from core import (
+from utils.core import (
     fetch, limited_as_completed
 )
 
@@ -68,20 +68,19 @@ async def get_recipes_on_page(recipe_page, session):
 
 def get_recipe_from_cell(recipe_cell):
     try:
-        name = recipe_cell.text
+        recipe_dict = {
+            'name': recipe_cell.find('h3', {'class': 'promo__title'}).text,
+            'category': recipe_cell.find('span', {'class': 'promo__type'}).text,
+            'link': recipe_cell['href']
+        }
+        print(f'Added recipe \'{recipe_dict["name"]}\'')
     except Exception as e:
         print(e)
-        return {}
-    recipe_dict = {
-        'name': name,
-        'category': recipe_cell.find('span', {'class': 'promo__type'}).text,
-        'link': recipe_cell['href']
-    }
-    print(f'Added recipe {recipe_dict["name"]}')
+        recipe_dict = {}
     return recipe_dict
 
 
-async def run():
+async def run(output_path):
     recipe_pages = []
     async with ClientSession() as session:
         for result in limited_as_completed(get_recipe_pages(session), 1000):
@@ -92,8 +91,8 @@ async def run():
                 continue
             if recipe_page:
                 recipe_pages.extend(recipe_page)
-        pd.DataFrame(recipe_pages).to_csv(os.path.join('data', 'bbc', 'recipe_pages.csv'))
+        pd.DataFrame(recipe_pages).to_csv(output_path)
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    asyncio.run(run(os.path.join('data', 'bbc', 'recipe_pages.csv')))

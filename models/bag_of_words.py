@@ -87,6 +87,20 @@ class RecipeAnalyzer(object):
         self._vectors = self._model.wv
         self.recipe_vectors = self.calc_recipe_vectors()
 
+    def get_word_vectors(self, words, safe=False):
+        vecs = []
+        for word in words:
+            if not word:
+                continue
+            try:
+                vec = self._vectors[word]
+            except KeyError:
+                if not safe:
+                    raise
+                vec = np.zeros(self.num_features)
+            vecs.append(vec)
+        return vecs
+
     def calc_recipe_vectors(self):
         """
         Calculate vectors for each recipe, by summing the individual word vectors for each ingredient
@@ -95,44 +109,31 @@ class RecipeAnalyzer(object):
         for idx, (name, processed_ingredients) in enumerate(self.corpus):
             vecs = []
             for ingredient_item in processed_ingredients:
-                for word in ingredient_item.split(' '):
-                    if not word:
-                        continue
-                    try:
-                        vec = self._vectors[word]
-                    except KeyError:
-                        vec = np.zeros(self.num_features)
-                    vecs.append(vec)
+                ingredient_vecs = self.get_word_vectors(ingredient_item.split(' '), safe=True)
+                vecs.extend(ingredient_vecs)
             vec_sum = sum(vecs)
             if not isinstance(vec_sum, np.ndarray) or len(vec_sum) != self.num_features:
                 vec_sum = np.zeros(self.num_features)
             vector_dict[name] = vec_sum
         return vector_dict
 
-    def calc_ingredient_vecs(self):
-        """
-        TODO refactor this to be less of a mess
-        Calculate vectors for each ingredient item
-        """
+    def get_unique_ingredients(self):
         unique_ingredients = set()
         for _, ingredients in self.corpus:
             for ingredient in ingredients:
                 unique_ingredients.add(ingredient)
         unique_ingredients = list(unique_ingredients)
         print(f'corpus contains {len(unique_ingredients)} unique words')
+        return unique_ingredients
+
+    def calc_ingredient_vecs(self):
+        """
+        Calculate vectors for each ingredient item
+        """
+        unique_ingredients = self.get_unique_ingredients()
         vector_dict = {}
         for ingredient in unique_ingredients:
-            if not ingredient:
-                continue
-            vecs = []
-            for word in ingredient.split(' '):
-                if not word:
-                    continue
-                try:
-                    vec = self._vectors[word]
-                except KeyError:
-                    vec = np.zeros(self.num_features)
-                vecs.append(vec)
+            vecs = self.get_word_vectors(ingredient.split(' '), safe=True)
             vec_sum = sum(vecs)
             if not isinstance(vec_sum, np.ndarray) or len(vec_sum) != self.num_features:
                 vec_sum = np.zeros(self.num_features)
@@ -197,7 +198,6 @@ class RecipeAnalyzer(object):
         ]
         kd_tree = KDTree(reduced_rec_vectors)
         _, indexes = kd_tree.query(target_vec, k=k)
-        # avoid get gen at index, very slow
         similar = [get_gen_at_index(self.corpus, idx)[0] for idx in indexes]
         similar_str = '\n- '.join(similar)
         print(f'Top {k} most similar recipes to {name}: \n- {similar_str}')
