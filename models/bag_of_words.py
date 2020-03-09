@@ -25,67 +25,75 @@ class RecipeAnalyzer(object):
 
     def __init__(self, corpus, num_features=100):
         self.corpus = corpus
-        self.recipe_vectors = {}
+        self._recipe_vectors = {}
         self._ingredient_vectors = {}
         self.num_features = num_features
         self._model = None
         self._k_means = None
         self._vectors = None
 
-    def init(self):
-        self.get_or_create_model()
-        self.save_template()
-        self.load_or_train()
-        self.save_trained()
+    def init(self, w2v_model_path, kv_file_path):
+        self.get_or_create_model(w2v_model_path)
+        self.save_template(w2v_model_path)
+        self.load_or_train(kv_file_path)
+        self.save_trained(kv_file_path)
 
     @property
     def model(self):
         return self._model
+
+    @property
+    def recipe_vectors(self):
+        return self._recipe_vectors
+
+    @property
+    def ingredient_vectors(self):
+        return self._ingredient_vectors
 
     def get_or_create_model(self, path=None):
         """
         Attempt to load an existing model from path, else create one
         """
         if not path:
-            path = os.path.join('..', 'created_models', 'w2v_ingredients.model')
+            path = os.path.join(os.pardir, 'created_models', 'w2v_ingredients.model')
         if not os.path.exists(path):
             self._model = Word2Vec([x for _, x in self.corpus], size=self.num_features)
         else:
             self._model = Word2Vec.load(path)
 
-    def save_template(self, name='w2v_ingredients.model'):
+    def save_template(self, path='w2v_ingredients.model'):
         """
         Save the Word2Vec model with a name
         """
-        self._model.save(os.path.join('..', 'created_models', name))
+        self._model.save(path)
 
-    def save_trained(self, name='trained_w2v_ingredients.kv'):
+    def save_trained(self, path='trained_w2v_ingredients.kv'):
         """
         Save the word vectors to a .kv file with name
         """
         if not self._vectors:
             raise SetupError('Model has not yet been trained')
-        self._vectors.save(os.path.join('..', 'created_models', name))
+        self._vectors.save(path)
 
-    def load_or_train(self, name='trained_w2v_ingredients.kv'):
+    def load_or_train(self, path='trained_w2v_ingredients.kv'):
         """
         Attempt to load the specified .kv file, else train model and create one
         """
-        path = os.path.join('..', 'created_models', name)
         if not os.path.exists(path):
             self.train()
         else:
             self._vectors = KeyedVectors.load(path, mmap='r')
-            self.recipe_vectors = self.calc_recipe_vectors()
+            self._recipe_vectors = self.calc_recipe_vectors()
 
     def train(self, epochs=5, **kwargs):
         """
         Train Word2Vec model, to generate word vectors
         """
-        self._model.train(self.corpus.get_processed_ingredients(), epochs=epochs,
-                          total_examples=self._model.corpus_count, **kwargs)
+        self._model.train(
+            [item[1] for item in self.corpus], epochs=epochs, total_examples=self._model.corpus_count, **kwargs
+        )
         self._vectors = self._model.wv
-        self.recipe_vectors = self.calc_recipe_vectors()
+        self._recipe_vectors = self.calc_recipe_vectors()
 
     def get_word_vectors(self, words, safe=False):
         vecs = []
@@ -146,7 +154,7 @@ class RecipeAnalyzer(object):
         :return:
         """
         if not path:
-            path = os.path.join('..', 'created_models', 'all_vectors.json')
+            path = os.path.join(os.pardir, 'created_models', 'all_vectors.json')
         ingredient_vecs = self.calc_ingredient_vecs()
         recipe_vecs = self.calc_recipe_vectors()
         word_vecs = {
@@ -163,9 +171,9 @@ class RecipeAnalyzer(object):
 
     def load_vecs(self, path=None):
         if not path:
-            os.path.join('..', 'created_models', 'all_vectors.json')
+            os.path.join(os.pardir, 'created_models', 'all_vectors.json')
         data = json.load(path)
-        self.recipe_vectors = data['recipes']
+        self._recipe_vectors = data['recipes']
         self._ingredient_vectors = data['ingredients']
         self._vectors = data['words']
 
@@ -175,26 +183,26 @@ class RecipeAnalyzer(object):
         """
         self._k_means = KMeans(
             n_clusters=n, random_state=0
-        ).fit(np.asarray(self.recipe_vectors.values()))
+        ).fit(np.asarray(self._recipe_vectors.values()))
 
     def print_clusters(self):
         """
         Print the K-means cluster data
         """
-        labels = list(self._k_means.predict(np.asarray(self.recipe_vectors.values())))
+        labels = list(self._k_means.predict(np.asarray(self._recipe_vectors.values())))
         labels_dict = defaultdict(list)
         for idx, label in enumerate(labels):
             labels_dict[label].append(get_gen_at_index(self.corpus.get_names(), idx))
         print(labels_dict)
 
-    def get_similar_to(self, name, k=5):
+    def get_similar_to(self, name, k=3):
         """
         Get the name of the k most similar recipes to the inputted name.
         Using cosine distance
         """
-        target_vec = self.recipe_vectors[name]
+        target_vec = self._recipe_vectors[name]
         reduced_rec_vectors = [
-            self.recipe_vectors[key] for key in self.recipe_vectors.keys() if key != name
+            self._recipe_vectors[key] for key in self._recipe_vectors.keys() if key != name
         ]
         kd_tree = KDTree(reduced_rec_vectors)
         _, indexes = kd_tree.query(target_vec, k=k)
@@ -203,14 +211,17 @@ class RecipeAnalyzer(object):
         print(f'Top {k} most similar recipes to {name}: \n- {similar_str}')
         return similar
 
-    def replace_ingredient(self, missing_ingredient, k=5):
-        """
-        Find the k most similar ingredients to a specified ingredient name.
-        Uses cosine distance
-        """
-        replacements = self.model.wv.most_similar(positive=[missing_ingredient], topn=k)
-        print(f'Replacing {missing_ingredient} with: \n{replacements}')
-        return replacements
+    def replace_ingredient(self, name, k=3):
+        target_vec = self._ingredient_vectors[name]
+        reduced_ing_vectors = [
+            self._ingredient_vectors[key] for key in self._ingredient_vectors.keys() if key.lower() != name.lower()
+        ]
+        kd_tree = KDTree(reduced_ing_vectors)
+        _, indexes = kd_tree.query(target_vec, k=k)
+        similar = [reduced_ing_vectors[idx] for idx in indexes]
+        similar_str = '\n- '.join(similar)
+        print(f'Top {k} most similar ingredients to {name}: \n- {similar_str}')
+        return similar
 
 
 class BaseCorpus(object):
@@ -228,7 +239,7 @@ class BaseRecipeCorpus(BaseCorpus):
 
     def __init__(self, corpus_path=None):
         if not corpus_path:
-            corpus_path = os.path.join('..', 'data', 'recipe_details.csv')
+            corpus_path = os.path.join(os.pardir, 'data', 'recipe_details.csv')
         super().__init__(corpus_path=corpus_path)
         self.column_names = []
 
@@ -252,10 +263,13 @@ class BaseRecipeCorpus(BaseCorpus):
         char_sets = [
             r'\d+[a-zA-Z/¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]+',
             r'\d+',
+            r' x ',
             r'[().,!?\'"\-+]',
             r'[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]',
+            r' tbsp|tsp|oz ',
         ]
-        return re.sub(r'|'.join(char_sets), '', item).strip()
+        filtered = re.sub(r'|'.join(char_sets), '', item).strip()
+        return re.sub(r' +', ' ', filtered)
 
     # def get_row(self, index):
     #     with open(self.corpus_path, 'r', encoding='utf-8') as f:
@@ -321,9 +335,9 @@ class IngredientOnlyCorpus(BaseRecipeCorpus):
         :return:
         """
         for row_tuple in super(IngredientOnlyCorpus, self).__iter__():
-            ingredients = row_tuple[5]
+            ingredients = row_tuple[4]
             ingredients = self.pre_process_ingredients(ingredients)
-            yield row_tuple[1], ingredients
+            yield row_tuple[0], ingredients
 
     def pre_process_ingredients(self, ingredients):
         return [self.remove_unwanted_chars(ingredient) for ingredient in ingredients.split('::')]
@@ -351,7 +365,7 @@ if __name__ == "__main__":
     _model = RecipeAnalyzer(corpus=IngredientOnlyCorpus())
     _model.init()
     for i in range(5):
-        _model.get_similar_to(random.choice(list(_model.recipe_vectors.keys())))
+        _model.get_similar_to(random.choice(list(_model._recipe_vectors.keys())))
 # TODO:
 # model loads generic corpus:
 # should have one parent corpus with __iter__ that reads entire line,

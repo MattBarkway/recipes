@@ -11,9 +11,7 @@ import requests
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
-from utils.core import (
-    fetch, limited_as_completed
-)
+from utils.core import limited_as_completed, get_content
 
 
 def get_recipe_pages(session):
@@ -48,13 +46,7 @@ def get_num_of_pages(url):
 
 
 async def get_recipes_on_page(recipe_page, session):
-    try:
-        print(f'fetching {recipe_page}')
-        html = await fetch(recipe_page, session)
-    except Exception as e:
-        print(e)
-        print(f'page not found {recipe_page}')
-        return []
+    html = await get_content(recipe_page, session)
     print(f'got data for {recipe_page}')
     soup = BeautifulSoup(html, 'html.parser')
     recipe_cells = soup.findAll('a', {'class': 'promo'})
@@ -80,16 +72,17 @@ def get_recipe_from_cell(recipe_cell):
     return recipe_dict
 
 
-async def run(output_path):
+async def run(output_path, k=100):
     fieldnames = ['name', 'category', 'link']
     async with ClientSession() as session:
         with open(output_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            for result in limited_as_completed(get_recipe_pages(session), 1000):
+            for result in limited_as_completed(get_recipe_pages(session), k):
                 try:
                     recipe_page = await result
                 except Exception as e:
                     print(e)
+                    raise
                     continue
                 if recipe_page:
                     for recipe in recipe_page:

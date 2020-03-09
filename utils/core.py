@@ -1,6 +1,8 @@
 import asyncio
 from itertools import islice
 
+from utils.exceptions import MaxRetryError
+
 
 async def fetch(url, session):
     async with session.get(url) as response:
@@ -30,11 +32,23 @@ def limited_as_completed(coroutines, limit=100):
                     futures.remove(f)
                     try:
                         new_f = next(coroutines)
-                        futures.append(
-                            asyncio.create_task(new_f))
-                    except StopIteration as e:
+                        futures.append(asyncio.create_task(new_f))
+                    except StopIteration:
                         pass
                     return f.result()
 
     while len(futures) > 0:
         yield first_to_finish()
+
+
+async def get_content(link, session, retries=5):
+    attempts = 1
+    while attempts <= retries:
+        try:
+            return await fetch(link, session)
+        except Exception as e:
+            print(f'request failed, message: \'{e}\' \nsleeping for 5 seconds...')
+            await asyncio.sleep(5)
+            print(f'retry: {attempts}')
+            attempts += 1
+    raise MaxRetryError('Exceeded maximum number of retries')

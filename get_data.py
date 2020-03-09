@@ -14,12 +14,12 @@ def scrape():
         os.mkdir('data')
     base_data_output_path = os.path.join('data', 'recipe_pages.csv')
     if not os.path.exists(base_data_output_path):
-        asyncio.run(get_recipe_links(base_data_output_path))
+        asyncio.run(get_recipe_links(base_data_output_path, k=10))
     details_output_path = os.path.join('data', 'recipe_details.csv')
     if not os.path.exists(details_output_path):
         df = pd.read_csv(base_data_output_path)
         df.columns = ['name', 'category', 'link']
-        asyncio.run(get_recipes(df, details_output_path))
+        asyncio.run(get_recipes(df, details_output_path, k=10))
         print(f'Data saved to file {details_output_path}')
     else:
         print('Data already exists')
@@ -27,11 +27,3 @@ def scrape():
 
 if __name__ == "__main__":
     scrape()
-    # TODO avoid loading all data in memory at any point
-    # Save each line as it is processed
-    # TODO scrape all details in one run, dont use intermediate file
-    # import csv
-    # fields = ['first', 'second', 'third']
-    # with open(r'name', 'a') as f:
-    #     writer = csv.writer(f)
-    #     writer.writerow(fields)

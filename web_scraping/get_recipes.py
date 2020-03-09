@@ -5,9 +5,7 @@ import os
 import pandas as pd
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-from utils.core import (
-    fetch, limited_as_completed
-)
+from utils.core import limited_as_completed, get_content
 
 
 def save_recipes(df, session):
@@ -20,14 +18,8 @@ def save_recipes(df, session):
             continue
 
 
-async def get_recipe(link, name, session):
+def process_recipe_html(html, name):
     recipe_dict = {}
-    try:
-        full_link = f'https://www.bbc.co.uk{link}'
-        html = await fetch(full_link, session)
-    except Exception as e:
-        print(f'request failed, message: {e}')
-        return {}
     soup = BeautifulSoup(html, 'html.parser')
     recipe_dict['name'] = getattr(soup.find('h1', {'class': 'gel-trafalgar content-title__text'}), 'text', name)
     try:
@@ -48,6 +40,11 @@ async def get_recipe(link, name, session):
     return recipe_dict
 
 
+async def get_recipe(link, name, session):
+    html = await get_content(f'https://www.bbc.co.uk{link}', session)
+    return process_recipe_html(html, name)
+
+
 def get_ingredients(soup):
     ingredients_html = soup.findAll("li", {"class": 'recipe-ingredients__list-item'})
     ingredients = []
@@ -64,12 +61,12 @@ def get_instructions(soup):
     return instructions
 
 
-async def run(df, output_path):
+async def run(df, output_path, k=100):
     fieldnames = ['name', 'cook_time', 'prep_time', 'serves', 'ingredients', 'instructions']
     async with ClientSession() as session:
         with open(output_path, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            for result in limited_as_completed(save_recipes(df, session), limit=1000):
+            for result in limited_as_completed(save_recipes(df, session), limit=k):
                 try:
                     recipe = await result
                 except Exception as e:
