@@ -13,6 +13,7 @@ def run():
     for i in range(5):
         rec_analyser.get_similar_recipes(random.choice(list(rec_analyser.recipe_vectors.keys())))
     for i in range(5):
+        # TODO need better processing of ingredients - remove information about quantities and any descriptive words
         rec_analyser.replace_ingredient(random.choice(list(rec_analyser.ingredient_vectors.keys())))
 
 
