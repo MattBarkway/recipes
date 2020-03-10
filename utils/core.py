@@ -7,11 +7,6 @@ async def fetch(url, session):
         return await response.read()
 
 
-async def bound_fetch(url, session, sem):
-    async with sem:
-        await fetch(url, session)
-
-
 def limited_as_completed(coroutines, limit=100):
     """
     taken from:

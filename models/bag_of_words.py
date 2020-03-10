@@ -177,17 +177,19 @@ class RecipeAnalyzer(object):
         """
         self._k_means = KMeans(
             n_clusters=n, random_state=0
-        ).fit(np.asarray(self._recipe_vectors.values()))
+        ).fit(np.asarray(list(self._recipe_vectors.values())))
 
     def print_clusters(self):
         """
         Print the K-means cluster data
         """
-        labels = list(self._k_means.predict(np.asarray(self._recipe_vectors.values())))
+        labels = list(self._k_means.predict(np.asarray(list(self._recipe_vectors.values()))))
         labels_dict = defaultdict(list)
-        for idx, label in enumerate(labels):
-            labels_dict[label].append(get_gen_at_index(self.corpus.get_names(), idx))
-        print(labels_dict)
+        for idx, label in enumerate(random.sample(labels, 50)):
+            labels_dict[label].append(get_gen_at_index(self.corpus, idx)[0])
+        for key in labels_dict:
+            print(f'{key}:=>')
+            print('\n'.join([f'\t- {item}' for item in labels_dict[key]]))
 
     def get_similar_recipes(self, name, k=3):
         """
@@ -213,7 +215,8 @@ class RecipeAnalyzer(object):
         similar = [reduced_names[idx] for idx in similar_indexes]
         return similar
 
-    def get_closest_indexes(self, vectors, target, k=3):
+    @staticmethod
+    def get_closest_indexes(vectors, target, k=3):
         kd_tree = cKDTree(vectors)
         _, indexes = kd_tree.query(target, k=k)
         return indexes

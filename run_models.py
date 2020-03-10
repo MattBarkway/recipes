@@ -16,6 +16,9 @@ def run():
         # TODO need better processing of ingredients - remove information about quantities and any descriptive words
         rec_analyser.replace_ingredient(random.choice(list(rec_analyser.ingredient_vectors.keys())))
 
+    rec_analyser.cluster(n=5)
+    rec_analyser.print_clusters()
+
 
 if __name__ == "__main__":
     run()

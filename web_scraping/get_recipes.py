@@ -6,7 +6,6 @@ import pandas as pd
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from utils.core import limited_as_completed, get_content
-from utils.exceptions import MaxRetryError
 
 
 def save_recipes(df, session):
