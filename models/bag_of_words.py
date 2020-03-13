@@ -1,7 +1,6 @@
 """
 Word2Vec model for recipe analysis
 """
-import json
 import os
 import csv
 import random
@@ -12,7 +11,7 @@ import numpy as np
 from gensim.models import Word2Vec, KeyedVectors
 
 from sklearn.cluster import KMeans
-from scipy.spatial import KDTree
+from scipy.spatial import cKDTree
 
 from utils.exceptions import SetupError
 from utils.helpers import get_gen_at_index
@@ -37,6 +36,8 @@ class RecipeAnalyzer(object):
         self.save_template(w2v_model_path)
         self.load_or_train(kv_file_path)
         self.save_trained(kv_file_path)
+        self._ingredient_vectors = self.calc_ingredient_vecs()
+        self._recipe_vectors = self.calc_recipe_vectors()
 
     @property
     def model(self):
@@ -148,34 +149,27 @@ class RecipeAnalyzer(object):
             vector_dict[ingredient] = vec_sum
         return vector_dict
 
-    def save_vecs(self, path=None):
-        """
-        Save word vectors, ingredient vectors and recipe level vectors to JSON
-        :return:
-        """
-        if not path:
-            path = os.path.join(os.pardir, 'created_models', 'all_vectors.json')
-        ingredient_vecs = self.calc_ingredient_vecs()
-        recipe_vecs = self.calc_recipe_vectors()
-        word_vecs = {
-            self._vectors.index2word[idx]: vec
-            for idx, vec in enumerate(self._vectors.vectors)
-        }
-        data = {
-            'ingredients': {key: value.tolist() for key, value in ingredient_vecs.items()},
-            'recipes': {key: value.tolist() for key, value in recipe_vecs.items()},
-            'words': {key: value.tolist() for key, value in word_vecs.items()},
-        }
-        with open(path, 'w') as f:
-            json.dump(data, f)
-
-    def load_vecs(self, path=None):
-        if not path:
-            os.path.join(os.pardir, 'created_models', 'all_vectors.json')
-        data = json.load(path)
-        self._recipe_vectors = data['recipes']
-        self._ingredient_vectors = data['ingredients']
-        self._vectors = data['words']
+    # def save_vecs(self, path=None):
+    #     """
+    #     Save word vectors, ingredient vectors and recipe level vectors to JSON
+    #     TODO rework this, file is way too big
+    #     :return:
+    #     """
+    #     if not path:
+    #         path = os.path.join(os.pardir, 'created_models', 'all_vectors.json')
+    #     ingredient_vecs = self.calc_ingredient_vecs()
+    #     recipe_vecs = self.calc_recipe_vectors()
+    #     word_vecs = {
+    #         self._vectors.index2word[idx]: vec
+    #         for idx, vec in enumerate(self._vectors.vectors)
+    #     }
+    #     data = {
+    #         'ingredients': {key: value.tolist() for key, value in ingredient_vecs.items()},
+    #         'recipes': {key: value.tolist() for key, value in recipe_vecs.items()},
+    #         'words': {key: value.tolist() for key, value in word_vecs.items()},
+    #     }
+    #     with open(path, 'w') as f:
+    #         json.dump(data, f)
 
     def cluster(self, n=3):
         """
@@ -183,45 +177,49 @@ class RecipeAnalyzer(object):
         """
         self._k_means = KMeans(
             n_clusters=n, random_state=0
-        ).fit(np.asarray(self._recipe_vectors.values()))
+        ).fit(np.asarray(list(self._recipe_vectors.values())))
 
     def print_clusters(self):
         """
         Print the K-means cluster data
         """
-        labels = list(self._k_means.predict(np.asarray(self._recipe_vectors.values())))
+        labels = list(self._k_means.predict(np.asarray(list(self._recipe_vectors.values()))))
         labels_dict = defaultdict(list)
-        for idx, label in enumerate(labels):
-            labels_dict[label].append(get_gen_at_index(self.corpus.get_names(), idx))
-        print(labels_dict)
+        for idx, label in enumerate(random.sample(labels, 50)):
+            labels_dict[label].append(get_gen_at_index(self.corpus, idx)[0])
+        for key in labels_dict:
+            print(f'{key}:=>')
+            print('\n'.join([f'\t- {item}' for item in labels_dict[key]]))
 
-    def get_similar_to(self, name, k=3):
+    def get_similar_recipes(self, name, k=3):
         """
         Get the name of the k most similar recipes to the inputted name.
         Using cosine distance
         """
-        target_vec = self._recipe_vectors[name]
-        reduced_rec_vectors = [
-            self._recipe_vectors[key] for key in self._recipe_vectors.keys() if key != name
-        ]
-        kd_tree = KDTree(reduced_rec_vectors)
-        _, indexes = kd_tree.query(target_vec, k=k)
-        similar = [get_gen_at_index(self.corpus, idx)[0] for idx in indexes]
+        similar = self.get_similar(self._recipe_vectors, name, k=k)
         similar_str = '\n- '.join(similar)
         print(f'Top {k} most similar recipes to {name}: \n- {similar_str}')
         return similar
 
     def replace_ingredient(self, name, k=3):
-        target_vec = self._ingredient_vectors[name]
-        reduced_ing_vectors = [
-            self._ingredient_vectors[key] for key in self._ingredient_vectors.keys() if key.lower() != name.lower()
-        ]
-        kd_tree = KDTree(reduced_ing_vectors)
-        _, indexes = kd_tree.query(target_vec, k=k)
-        similar = [reduced_ing_vectors[idx] for idx in indexes]
+        similar = self.get_similar(self._ingredient_vectors, name, k=k)
         similar_str = '\n- '.join(similar)
         print(f'Top {k} most similar ingredients to {name}: \n- {similar_str}')
         return similar
+
+    def get_similar(self, vectors, name, k=3):
+        target_vec = vectors[name]
+        reduced_names = [key for key in vectors.keys() if key.lower() != name.lower()]
+        reduced_vectors = [vectors[key] for key in vectors.keys() if key.lower() != name.lower()]
+        similar_indexes = self.get_closest_indexes(reduced_vectors, target_vec, k=k)
+        similar = [reduced_names[idx] for idx in similar_indexes]
+        return similar
+
+    @staticmethod
+    def get_closest_indexes(vectors, target, k=3):
+        kd_tree = cKDTree(vectors)
+        _, indexes = kd_tree.query(target, k=k)
+        return indexes
 
 
 class BaseCorpus(object):
@@ -365,7 +363,7 @@ if __name__ == "__main__":
     _model = RecipeAnalyzer(corpus=IngredientOnlyCorpus())
     _model.init()
     for i in range(5):
-        _model.get_similar_to(random.choice(list(_model._recipe_vectors.keys())))
+        _model.get_similar_recipes(random.choice(list(_model._recipe_vectors.keys())))
 # TODO:
 # model loads generic corpus:
 # should have one parent corpus with __iter__ that reads entire line,
