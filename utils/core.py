@@ -39,14 +39,14 @@ def limited_as_completed(coroutines, limit=100):
         yield first_to_finish()
 
 
-async def get_content(link, session, retries=5):
+async def get_content(link, session, retries=5, sleep_time=30):
     attempts = 1
     while attempts <= retries:
         try:
             return await fetch(link, session)
         except Exception as e:
             print(f'request failed, message: \'{e}\' \nsleeping for 5 seconds...')
-            await asyncio.sleep(5)
+            await asyncio.sleep(sleep_time)
             print(f'retry: {attempts}')
             attempts += 1
     return None
