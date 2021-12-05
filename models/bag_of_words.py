@@ -11,7 +11,7 @@ import numpy as np
 from gensim.models import Word2Vec, KeyedVectors
 
 from sklearn.cluster import KMeans
-from scipy.spatial import cKDTree
+from scipy.spatial import KDTree
 
 from utils.exceptions import SetupError
 from utils.helpers import get_gen_at_index
@@ -58,7 +58,7 @@ class RecipeAnalyzer(object):
         if not path:
             path = os.path.join(os.pardir, 'created_models', 'w2v_ingredients.model')
         if not os.path.exists(path):
-            self._model = Word2Vec([x for _, x in self.corpus], size=self.num_features)
+            self._model = Word2Vec([x for _, x in self.corpus], vector_size=self.num_features)
         else:
             self._model = Word2Vec.load(path)
 
@@ -217,7 +217,7 @@ class RecipeAnalyzer(object):
 
     @staticmethod
     def get_closest_indexes(vectors, target, k=3):
-        kd_tree = cKDTree(vectors)
+        kd_tree = KDTree(vectors)
         _, indexes = kd_tree.query(target, k=k)
         return indexes
 
