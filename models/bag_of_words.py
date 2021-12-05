@@ -149,28 +149,6 @@ class RecipeAnalyzer(object):
             vector_dict[ingredient] = vec_sum
         return vector_dict
 
-    # def save_vecs(self, path=None):
-    #     """
-    #     Save word vectors, ingredient vectors and recipe level vectors to JSON
-    #     TODO rework this, file is way too big
-    #     :return:
-    #     """
-    #     if not path:
-    #         path = os.path.join(os.pardir, 'created_models', 'all_vectors.json')
-    #     ingredient_vecs = self.calc_ingredient_vecs()
-    #     recipe_vecs = self.calc_recipe_vectors()
-    #     word_vecs = {
-    #         self._vectors.index2word[idx]: vec
-    #         for idx, vec in enumerate(self._vectors.vectors)
-    #     }
-    #     data = {
-    #         'ingredients': {key: value.tolist() for key, value in ingredient_vecs.items()},
-    #         'recipes': {key: value.tolist() for key, value in recipe_vecs.items()},
-    #         'words': {key: value.tolist() for key, value in word_vecs.items()},
-    #     }
-    #     with open(path, 'w') as f:
-    #         json.dump(data, f)
-
     def cluster(self, n=3):
         """
         Perform K-means clustering on the recipe vector data
@@ -185,9 +163,9 @@ class RecipeAnalyzer(object):
         """
         labels = list(self._k_means.predict(np.asarray(list(self._recipe_vectors.values()))))
         labels_dict = defaultdict(list)
-        for idx, label in enumerate(random.sample(labels, 50)):
+        for idx, label in random.sample(list(enumerate(labels)), 50):
             labels_dict[label].append(get_gen_at_index(self.corpus, idx)[0])
-        for key in labels_dict:
+        for key in sorted(list(labels_dict.keys())):
             print(f'{key}:=>')
             print('\n'.join([f'\t- {item}' for item in labels_dict[key]]))
 
@@ -209,8 +187,11 @@ class RecipeAnalyzer(object):
 
     def get_similar(self, vectors, name, k=3):
         target_vec = vectors[name]
-        reduced_names = [key for key in vectors.keys() if key.lower() != name.lower()]
-        reduced_vectors = [vectors[key] for key in vectors.keys() if key.lower() != name.lower()]
+        reduced_names, reduced_vectors = [], []
+        for key, value in vectors.items():
+            if key.lower() != name.lower():
+                reduced_names.append(key)
+                reduced_vectors.append(value)
         similar_indexes = self.get_closest_indexes(reduced_vectors, target_vec, k=k)
         similar = [reduced_names[idx] for idx in similar_indexes]
         return similar
